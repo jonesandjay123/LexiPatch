@@ -17,6 +17,12 @@ class LibraryFragment : Fragment() {
 
     private lateinit var adapter: VocabAdapter
     private lateinit var recyclerView: RecyclerView
+    private lateinit var ttsHelper: TTSHelper
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ttsHelper = TTSHelper(requireContext())
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -35,6 +41,9 @@ class LibraryFragment : Fragment() {
             },
             onItemLongClick = { item, position ->
                 showDeleteDialog(item, position)
+            },
+            onSpeakClick = { item ->
+                speakItem(item)
             }
         )
         recyclerView.adapter = adapter
@@ -49,6 +58,23 @@ class LibraryFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         refreshList()
+    }
+    
+    override fun onDestroy() {
+        if (::ttsHelper.isInitialized) {
+            ttsHelper.shutdown()
+        }
+        super.onDestroy()
+    }
+
+    private fun speakItem(item: VocabItem) {
+        val textToSpeak = if (item.abbr.isNullOrEmpty()) {
+            item.english
+        } else {
+            // Speak english then spell out abbreviation (spaced out)
+            "${item.english}. ${item.abbr.toCharArray().joinToString(" ")}"
+        }
+        ttsHelper.speak(textToSpeak)
     }
 
     private fun refreshList() {

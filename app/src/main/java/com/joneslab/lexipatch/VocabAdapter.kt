@@ -9,17 +9,19 @@ import androidx.recyclerview.widget.RecyclerView
 class VocabAdapter(
     private var items: List<VocabItem>,
     private val onItemClick: (VocabItem) -> Unit,
-    private val onItemLongClick: (VocabItem, Int) -> Unit
+    private val onItemLongClick: (VocabItem, Int) -> Unit,
+    private val onSpeakClick: (VocabItem) -> Unit
 ) : RecyclerView.Adapter<VocabAdapter.VocabViewHolder>() {
 
     class VocabViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val englishText: TextView = view.findViewById(android.R.id.text1)
-        val chineseText: TextView = view.findViewById(android.R.id.text2)
+        val englishText: TextView = view.findViewById(R.id.text_english)
+        val chineseText: TextView = view.findViewById(R.id.text_chinese)
+        val speakButton: View = view.findViewById(R.id.btn_speak)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VocabViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(android.R.layout.simple_list_item_2, parent, false)
+            .inflate(R.layout.item_vocab, parent, false)
         return VocabViewHolder(view)
     }
 
@@ -33,6 +35,9 @@ class VocabAdapter(
         holder.itemView.setOnLongClickListener {
             onItemLongClick(item, position)
             true
+        }
+        holder.speakButton.setOnClickListener {
+            onSpeakClick(item)
         }
     }
 
