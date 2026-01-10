@@ -19,9 +19,11 @@
         android:layout_weight="1"
         android:gravity="top|start"
         android:hint="Paste English text here..."
+        android:textColorHint="#AAAAAA"
         android:inputType="textMultiLine"
         android:padding="8dp"
-        android:background="@android:drawable/edit_text"
+        android:background="#333333"
+        android:textColor="#FFFFFF"
         android:layout_marginTop="8dp" />
         
     <EditText

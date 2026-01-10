@@ -40,23 +40,18 @@ class PasteFragment : Fragment() {
         progressBar = view.findViewById(R.id.progress_bar)
         tvStatus = view.findViewById(R.id.tv_status)
 
-        // Pre-fill API Key logic if desired, or leave it for user to input if not hardcoded
-        // In a real app, strict NO-NO to hardcode keys. 
-        // We'll leave it invisible by default as per layout, but logic could toggle it.
-        // For this MVP, we will assume user might put it in local.properties or just hardcode for demo if provided.
-        // Since user didn't provide one, we show the field if we want, or just fail gracefully.
-        // Let's make it visible so user can enter it as requirements say "structure it so I can add my key easily".
-        etApiKey.visibility = View.VISIBLE
+        // API Key is now handled securely via BuildConfig (read from local.properties)
+        etApiKey.visibility = View.GONE
 
         btnGenerate.setOnClickListener {
             val text = etInput.text.toString()
-            val apiKey = etApiKey.text.toString()
+            val apiKey = BuildConfig.GEMINI_API_KEY
             if (text.isBlank()) {
                 Toast.makeText(context, "Please paste some text", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (apiKey.isBlank()) {
-                Toast.makeText(context, "Please enter Gemini API Key", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "API Key missing in local.properties (GEMINI_API_KEY=...)", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
             generateVocabulary(text, apiKey)
@@ -72,18 +67,39 @@ class PasteFragment : Fragment() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val result = callGeminiApi(text, apiKey)
+                // Using the official Google Gen AI Java SDK
+                val client = com.google.genai.Client.builder()
+                    .apiKey(apiKey)
+                    .build()
+                
+                val prompt = "Extract up to 20 useful vocabulary words from the following text for an English learner. " +
+                        "Provide the English word, its Chinese meaning, and an optional abbreviation if common. " +
+                        "Strictly return ONLY a JSON object with this format: " +
+                        "{ \"items\": [ { \"english\": \"...\", \"abbr\": \"...\", \"chinese\": \"...\" } ] }. " +
+                        "Do not use markdown formatting. Text: $text"
+
+                val response = client.models.generateContent(
+                    "gemini-2.0-flash-exp", // or gemini-1.5-flash which is stable
+                    prompt,
+                    null
+                )
+                
+                // The SDK returns text from the response
+                val responseText = response.text() ?: ""
+                
+                val vocabItems = parseGeminiResponse(responseText)
+
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     btnGenerate.isEnabled = true
-                    if (result != null) {
-                        // Launch Review Activity
+                    
+                    if (vocabItems.isNotEmpty()) {
                         val intent = Intent(requireContext(), ReviewActivity::class.java)
                         val gson = Gson()
-                        intent.putExtra("items_json", gson.toJson(result))
+                        intent.putExtra("items_json", gson.toJson(vocabItems))
                         startActivity(intent)
                     } else {
-                        tvStatus.text = "Failed to generate vocabulary. Check API Key or Network."
+                        tvStatus.text = "No vocabulary found or parsing failed."
                         tvStatus.visibility = View.VISIBLE
                     }
                 }
@@ -91,7 +107,7 @@ class PasteFragment : Fragment() {
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     btnGenerate.isEnabled = true
-                    tvStatus.text = "Error: ${e.message}"
+                    tvStatus.text = "Error: ${e.localizedMessage}"
                     tvStatus.visibility = View.VISIBLE
                     e.printStackTrace()
                 }
@@ -100,80 +116,26 @@ class PasteFragment : Fragment() {
     }
 
     private fun callGeminiApi(inputText: String, apiKey: String): List<VocabItem>? {
-        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$apiKey")
-        val conn = url.openConnection() as HttpURLConnection
-        conn.requestMethod = "POST"
-        conn.setRequestProperty("Content-Type", "application/json")
-        conn.doOutput = true
-
-        val prompt = "Extract up to 20 useful vocabulary words from the following text for an English learner. " +
-                "Provide the English word, its Chinese meaning, and an optional abbreviation if common. " +
-                "Strictly return ONLY a JSON object with this format: " +
-                "{ \"items\": [ { \"english\": \"...\", \"abbr\": \"...\", \"chinese\": \"...\" } ] }. " +
-                "Do not use markdown formatting. Text: $inputText"
-
-        val jsonBody = """
-            {
-              "contents": [{
-                "parts":[{
-                  "text": "$prompt"
-                }]
-              }]
-            }
-        """.trimIndent()
-
-        // Handle potential strict JSON issues with quotes in prompt? 
-        // For MVP simplicity we assume simple user input. In production, use Gson to construct body.
-        val safeJsonBody = Gson().toJson(mapOf(
-            "contents" to listOf(mapOf(
-                "parts" to listOf(mapOf("text" to prompt))
-            ))
-        ))
-
-        try {
-            val writer = OutputStreamWriter(conn.outputStream)
-            writer.write(safeJsonBody)
-            writer.flush()
-            writer.close()
-
-            val responseCode = conn.responseCode
-            if (responseCode == 200) {
-                val response = conn.inputStream.bufferedReader().use { it.readText() }
-                return parseGeminiResponse(response)
-            } else {
-                // Log error
-                return null
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        } finally {
-            conn.disconnect()
-        }
+        // Deprecated: Replaced by Google Gen AI SDK
+        return null
     }
 
-    private fun parseGeminiResponse(jsonResponse: String): List<VocabItem> {
-        // Gemini returns a complex nested JSON. We need to extract the text from candidates[0].content.parts[0].text
-        // Then parse that text as our expected JSON.
+    private fun parseGeminiResponse(responseText: String): List<VocabItem> {
         try {
-            val gson = Gson()
-            val mapType = object : TypeToken<Map<String, Any>>() {}.type
-            val rootMap: Map<String, Any> = gson.fromJson(jsonResponse, mapType)
-            
-            val candidates = rootMap["candidates"] as? List<Map<String, Any>>
-            val content = candidates?.get(0)?.get("content") as? Map<String, Any>
-            val parts = content?.get("parts") as? List<Map<String, Any>>
-            var text = parts?.get(0)?.get("text") as? String ?: return emptyList()
-
+            var text = responseText.trim()
             // Cleanup markdown code blocks if present
-            text = text.replace("```json", "").replace("```", "").trim()
+            if (text.startsWith("```")) {
+                text = text.replace("```json", "").replace("```", "").trim()
+            }
 
+            val gson = Gson()
             val resultType = object : TypeToken<Map<String, List<VocabItem>>>() {}.type
             val resultMap: Map<String, List<VocabItem>> = gson.fromJson(text, resultType)
             
             return resultMap["items"] ?: emptyList()
         } catch (e: Exception) {
             e.printStackTrace()
+            // Fallback: try to see if it's a raw list? No, prompt asks for object.
             return emptyList()
         }
     }
