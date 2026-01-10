@@ -79,7 +79,7 @@ class PasteFragment : Fragment() {
                         "Do not use markdown formatting. Text: $text"
 
                 val response = client.models.generateContent(
-                    "gemini-2.0-flash-exp", // or gemini-1.5-flash which is stable
+                    "gemini-2.5-flash", // or gemini-1.5-flash which is stable
                     prompt,
                     null
                 )
