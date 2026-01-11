@@ -47,6 +47,10 @@ object VocabularyRepository {
         saveToFile(context, list)
     }
 
+    fun replaceAll(context: Context, items: List<VocabItem>) {
+        saveToFile(context, items)
+    }
+
     fun deleteAt(context: Context, index: Int) {
         val list = getAll(context).toMutableList()
         if (index in list.indices) {

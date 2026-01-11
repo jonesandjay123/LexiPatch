@@ -11,7 +11,15 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import android.widget.ImageButton
+import android.widget.PopupMenu
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 class LibraryFragment : Fragment() {
 
@@ -19,9 +27,13 @@ class LibraryFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var ttsHelper: TTSHelper
 
+    private lateinit var exportLauncher: ActivityResultLauncher<String>
+    private lateinit var importLauncher: ActivityResultLauncher<Array<String>>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ttsHelper = TTSHelper(requireContext())
+        setupLaunchers()
     }
 
     override fun onCreateView(
@@ -31,6 +43,9 @@ class LibraryFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_library, container, false)
         recyclerView = view.findViewById(R.id.recycler_view)
         val fab: FloatingActionButton = view.findViewById(R.id.fab_add)
+        val btnMenu: ImageButton = view.findViewById(R.id.btn_menu)
+
+        btnMenu.setOnClickListener { showMenu(it) }
 
         recyclerView.layoutManager = LinearLayoutManager(context)
         
@@ -137,5 +152,92 @@ class LibraryFragment : Fragment() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+    private fun setupLaunchers() {
+        exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            uri?.let {
+                try {
+                    val context = requireContext()
+                    val items = VocabularyRepository.getAll(context)
+                    val json = Gson().toJson(items)
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                        outputStream.write(json.toByteArray())
+                    }
+                    Toast.makeText(context, "Exported successfully", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    Toast.makeText(context, "Export failed", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                showImportConfirmation(it)
+            }
+        }
+    }
+
+    private fun showMenu(view: View) {
+        val popup = PopupMenu(requireContext(), view)
+        popup.menu.add("Export Vocabulary")
+        popup.menu.add("Import Vocabulary")
+        popup.setOnMenuItemClickListener { item ->
+            when (item.title) {
+                "Export Vocabulary" -> {
+                    exportLauncher.launch("vocabulary_backup.json")
+                    true
+                }
+                "Import Vocabulary" -> {
+                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun showImportConfirmation(uri: android.net.Uri) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Import Vocabulary")
+            .setMessage("Importing will replace your current vocabulary list. This action cannot be undone.")
+            .setPositiveButton("Import") { _, _ ->
+                performImport(uri)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performImport(uri: android.net.Uri) {
+        try {
+            val context = requireContext()
+            val contentResolver = context.contentResolver
+            val stringBuilder = StringBuilder()
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                    var line: String? = reader.readLine()
+                    while (line != null) {
+                        stringBuilder.append(line)
+                        line = reader.readLine()
+                    }
+                }
+            }
+            
+            val json = stringBuilder.toString()
+            val type = object : TypeToken<List<VocabItem>>() {}.type
+            val items: List<VocabItem> = Gson().fromJson(json, type)
+            
+            if (items.isNotEmpty()) {
+                VocabularyRepository.replaceAll(context, items)
+                refreshList()
+                Toast.makeText(context, "Imported ${items.size} words", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "No items found in file", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Import failed: Invalid format", Toast.LENGTH_SHORT).show()
+        }
     }
 }

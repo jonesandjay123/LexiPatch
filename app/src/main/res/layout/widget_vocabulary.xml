@@ -50,6 +50,18 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/btn_speak"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginEnd="4dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:gravity="center"
+        android:text="🔊"
+        android:textSize="18sp"
+        android:contentDescription="Speak" />
+
     <ImageButton
         android:id="@+id/btn_next"
         android:layout_width="32dp"

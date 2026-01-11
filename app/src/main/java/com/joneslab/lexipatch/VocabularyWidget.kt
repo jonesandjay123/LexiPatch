@@ -6,7 +6,9 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.speech.tts.TextToSpeech
 import android.widget.RemoteViews
+import java.util.Locale
 
 /**
  * Implementation of App Widget functionality.
@@ -16,7 +18,10 @@ class VocabularyWidget : AppWidgetProvider() {
     companion object {
         const val ACTION_PREV = "com.joneslab.lexipatch.ACTION_PREV"
         const val ACTION_NEXT = "com.joneslab.lexipatch.ACTION_NEXT"
+        const val ACTION_SPEAK = "com.joneslab.lexipatch.ACTION_SPEAK"
     }
+
+    private var tts: TextToSpeech? = null
 
     override fun onUpdate(
         context: Context,
@@ -38,6 +43,16 @@ class VocabularyWidget : AppWidgetProvider() {
         } else if (intent.action == ACTION_NEXT) {
             VocabularyRepository.next(context)
             updateAllWidgets(context)
+        } else if (intent.action == ACTION_SPEAK) {
+            val item = VocabularyRepository.getCurrentItem(context)
+            if (item != null) {
+                tts = TextToSpeech(context.applicationContext) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        tts?.language = Locale.US
+                        tts?.speak(item.english, TextToSpeech.QUEUE_FLUSH, null, null)
+                    }
+                }
+            }
         } else if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
             updateAllWidgets(context)
         }
@@ -94,6 +109,15 @@ class VocabularyWidget : AppWidgetProvider() {
             context, 2, appIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.appwidget_text_english, appPendingIntent)
+
+        // Setup Speak Button Intent
+        val speakIntent = Intent(context, VocabularyWidget::class.java).apply {
+            action = ACTION_SPEAK
+        }
+        val speakPendingIntent = PendingIntent.getBroadcast(
+            context, 3, speakIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.btn_speak, speakPendingIntent)
 
         // Instruct the widget manager to update the widget
         appWidgetManager.updateAppWidget(appWidgetId, views)
