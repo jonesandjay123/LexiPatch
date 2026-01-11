@@ -35,7 +35,7 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:src="@android:drawable/ic_lock_silent_mode_off"
+        android:src="@drawable/brand_awareness_24"
         android:contentDescription="Speak"
         android:padding="8dp" />
 

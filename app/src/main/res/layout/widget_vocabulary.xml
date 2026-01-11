@@ -13,7 +13,7 @@
         android:layout_centerVertical="true"
         android:background="?android:attr/selectableItemBackground"
         android:contentDescription="Previous"
-        android:src="@android:drawable/ic_media_previous"
+        android:src="@drawable/skip_previous_24"
         android:tint="@color/widget_text_secondary" />
 
     <ImageView
@@ -26,7 +26,7 @@
         android:background="?android:attr/selectableItemBackground"
         android:contentDescription="Speak"
         android:padding="4dp"
-        android:src="@drawable/ic_speaker_minimal" />
+        android:src="@drawable/brand_awareness_24" />
 
     <LinearLayout
         android:id="@+id/layout_text_container"
@@ -70,7 +70,7 @@
         android:layout_centerVertical="true"
         android:background="?android:attr/selectableItemBackground"
         android:contentDescription="Next"
-        android:src="@android:drawable/ic_media_next"
+        android:src="@drawable/skip_next_24"
         android:tint="@color/widget_text_secondary" />
 
 </RelativeLayout>
